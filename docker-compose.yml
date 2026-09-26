@@ -1,0 +1,39 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: urban
+      POSTGRES_PASSWORD: urban
+      POSTGRES_DB: urban
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U urban"]
+      interval: 5s
+      retries: 10
+
+  app:
+    build: .
+    profiles: [app] # `docker compose --profile app up` for the full stack; dev uses db only
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      DATABASE_URL: postgresql://urban:urban@db:5432/urban?schema=public
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET}
+      CRON_SECRET: ${CRON_SECRET:?set CRON_SECRET}
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      UPLOAD_DIR: /data/uploads
+    ports: ["3000:3000"]
+    volumes: [uploads:/data/uploads]
+
+  cron:
+    image: curlimages/curl:8.10.1
+    profiles: [app]
+    depends_on: [app]
+    environment:
+      CRON_SECRET: ${CRON_SECRET}
+    entrypoint: ["/bin/sh", "-c", "while true; do sleep 1800; curl -fsS -X POST -H \"Authorization: Bearer $$CRON_SECRET\" http://app:3000/api/cron/sync; echo; done"]
+
+volumes:
+  pgdata:
+  uploads:
