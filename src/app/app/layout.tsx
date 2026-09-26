@@ -13,6 +13,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <Link href="/app/properties" className="text-neutral-600 hover:text-neutral-900">Proprietăți</Link>
           <Link href="/app/cleaners" className="text-neutral-600 hover:text-neutral-900">Echipă</Link>
           <Link href="/app/payouts" className="text-neutral-600 hover:text-neutral-900">Decont</Link>
+          <Link href="/app/compliance" className="text-neutral-600 hover:text-neutral-900">SITUR</Link>
+          <Link href="/app/billing" className="text-neutral-600 hover:text-neutral-900">Abonament</Link>
           <span className="ml-auto text-neutral-500">{user.email}</span>
           <form action={logout}><button className="text-neutral-600 hover:text-neutral-900">Ieșire</button></form>
         </nav>

@@ -63,3 +63,13 @@ export function isBlock(source: FeedSourceT, summary: string | undefined | null)
 export function isAtRisk(t: { status: string; dueBy: Date }, now = new Date()): boolean {
   return t.status === "PENDING" && t.dueBy.getTime() - now.getTime() < 60 * 60 * 1000;
 }
+
+/**
+ * A day-before SMS reminder is due once a turnover's cleaning window starts
+ * within the next 24h — never before, and (via remindedAt) never twice.
+ */
+export function needsReminder(t: { status: string; dueFrom: Date; remindedAt: Date | null }, now = new Date()): boolean {
+  if (t.status !== "PENDING" || t.remindedAt) return false;
+  const ms = t.dueFrom.getTime() - now.getTime();
+  return ms > 0 && ms <= 24 * 60 * 60 * 1000;
+}

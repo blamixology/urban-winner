@@ -1,13 +1,6 @@
 import { and, asc, eq, gte, lt } from "drizzle-orm";
 import { db, schema as s } from "./db";
-import { dayInTz, zonedToUtc } from "./time";
-
-export function monthRange(month: string | undefined): { month: string; from: Date; to: Date } {
-  const m = month && /^\d{4}-(0[1-9]|1[0-2])$/.test(month) ? month : dayInTz(new Date()).slice(0, 7);
-  const [y, mo] = m.split("-").map(Number);
-  const next = mo === 12 ? `${y + 1}-01` : `${y}-${String(mo + 1).padStart(2, "0")}`;
-  return { month: m, from: zonedToUtc(`${m}-01`, "00:00"), to: zonedToUtc(`${next}-01`, "00:00") };
-}
+import { monthRange } from "./time";
 
 export async function payouts(ownerId: string, month?: string) {
   const range = monthRange(month);

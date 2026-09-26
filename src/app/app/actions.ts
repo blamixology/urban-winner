@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db, schema as s } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { assertCanAddProperty } from "@/lib/billing";
 import { newCleanerToken } from "@/lib/cleaner";
 import { rebuildTurnovers, syncAll, syncProperty } from "@/lib/sync";
 
@@ -35,6 +36,7 @@ const DEFAULT_CHECKLIST = [
 
 export async function createProperty(form: FormData) {
   const user = await requireUser();
+  await assertCanAddProperty(user);
   const name = z.string().trim().min(1).max(120).parse(form.get("name"));
   const id = await db.transaction(async (tx) => {
     const [p] = await tx.insert(s.properties).values({ ownerId: user.id, name }).returning({ id: s.properties.id });

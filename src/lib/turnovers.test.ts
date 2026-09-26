@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isAtRisk, isBlock, planTurnovers, type ResLike } from "./turnovers";
+import { isAtRisk, isBlock, needsReminder, planTurnovers, type ResLike } from "./turnovers";
 import { parseIcs, planSync } from "./ical";
 import { zonedToUtc } from "./time";
 
@@ -68,6 +68,25 @@ describe("isBlock / isAtRisk", () => {
     expect(isAtRisk({ status: "PENDING", dueBy: new Date("2026-10-03T12:00:00Z") }, now)).toBe(true);
     expect(isAtRisk({ status: "IN_PROGRESS", dueBy: new Date("2026-10-03T12:00:00Z") }, now)).toBe(false);
     expect(isAtRisk({ status: "PENDING", dueBy: new Date("2026-10-03T15:00:00Z") }, now)).toBe(false);
+  });
+});
+
+describe("needsReminder", () => {
+  const now = new Date("2026-10-03T10:00:00Z");
+  it("fires once the cleaning window starts within 24h", () => {
+    expect(needsReminder({ status: "PENDING", dueFrom: new Date("2026-10-04T09:00:00Z"), remindedAt: null }, now)).toBe(true);
+  });
+  it("is quiet more than 24h out", () => {
+    expect(needsReminder({ status: "PENDING", dueFrom: new Date("2026-10-05T09:00:00Z"), remindedAt: null }, now)).toBe(false);
+  });
+  it("is quiet once the window has already started", () => {
+    expect(needsReminder({ status: "PENDING", dueFrom: new Date("2026-10-03T09:00:00Z"), remindedAt: null }, now)).toBe(false);
+  });
+  it("never repeats once reminded", () => {
+    expect(needsReminder({ status: "PENDING", dueFrom: new Date("2026-10-04T09:00:00Z"), remindedAt: new Date("2026-10-03T09:00:00Z") }, now)).toBe(false);
+  });
+  it("skips non-pending turnovers", () => {
+    expect(needsReminder({ status: "IN_PROGRESS", dueFrom: new Date("2026-10-04T09:00:00Z"), remindedAt: null }, now)).toBe(false);
   });
 });
 

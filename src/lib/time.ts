@@ -39,3 +39,11 @@ export function fmtTime(date: Date, tz = TZ): string {
 export function fmtDay(date: Date, tz = TZ): string {
   return new Intl.DateTimeFormat("ro-RO", { timeZone: tz, weekday: "long", day: "numeric", month: "long" }).format(date);
 }
+
+/** Validates `month` (YYYY-MM, defaulting to the current month) and returns its UTC bounds. */
+export function monthRange(month: string | undefined, tz = TZ): { month: string; from: Date; to: Date } {
+  const m = month && /^\d{4}-(0[1-9]|1[0-2])$/.test(month) ? month : dayInTz(new Date(), tz).slice(0, 7);
+  const [y, mo] = m.split("-").map(Number);
+  const next = mo === 12 ? `${y + 1}-01` : `${y}-${String(mo + 1).padStart(2, "0")}`;
+  return { month: m, from: zonedToUtc(`${m}-01`, "00:00", tz), to: zonedToUtc(`${next}-01`, "00:00", tz) };
+}

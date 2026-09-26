@@ -2,6 +2,7 @@ import Link from "next/link";
 import { asc, count, eq } from "drizzle-orm";
 import { db, schema as s } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { FREE_PROPERTY_LIMIT } from "@/lib/billing";
 import { createProperty } from "../actions";
 
 export default async function Properties() {
@@ -21,13 +22,22 @@ export default async function Properties() {
     .groupBy(s.properties.id, s.cleaners.name)
     .orderBy(asc(s.properties.name));
 
+  const atLimit = user.plan === "FREE" && properties.length >= FREE_PROPERTY_LIMIT;
+
   return (
     <div className="space-y-6">
       <h1 className="h1">Proprietăți</h1>
-      <form action={createProperty} className="card flex gap-2">
-        <input name="name" required placeholder="ex. Ap. 2 camere Floreasca" className="input" />
-        <button className="btn shrink-0">Adaugă</button>
-      </form>
+      {atLimit ? (
+        <div className="card border-amber-300 bg-amber-50 text-sm text-amber-900">
+          Ai atins limita planului gratuit ({FREE_PROPERTY_LIMIT} proprietate).{" "}
+          <Link href="/app/billing" className="underline">Treci la Pro</Link> pentru proprietăți nelimitate.
+        </div>
+      ) : (
+        <form action={createProperty} className="card flex gap-2">
+          <input name="name" required placeholder="ex. Ap. 2 camere Floreasca" className="input" />
+          <button className="btn shrink-0">Adaugă</button>
+        </form>
+      )}
       <div className="grid gap-3 sm:grid-cols-2">
         {properties.map((p) => (
           <Link key={p.id} href={`/app/properties/${p.id}`} className="card hover:border-neutral-400">

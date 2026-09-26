@@ -6,12 +6,16 @@ const ts = (name: string) => timestamp(name, { withTimezone: true });
 
 export const feedSource = pgEnum("feed_source", ["AIRBNB", "BOOKING", "OTHER"]);
 export const turnoverStatus = pgEnum("turnover_status", ["PENDING", "IN_PROGRESS", "DONE", "ISSUE", "CANCELLED"]);
+export const userPlan = pgEnum("user_plan", ["FREE", "PRO"]);
 
 export const users = pgTable("users", {
   id: id(),
   email: text("email").notNull().unique(),
   name: text("name"),
   passwordHash: text("password_hash").notNull(),
+  plan: userPlan("plan").notNull().default("FREE"),
+  stripeCustomerId: text("stripe_customer_id").unique(),
+  stripeSubscriptionId: text("stripe_subscription_id"),
   createdAt: ts("created_at").notNull().defaultNow(),
 });
 
@@ -88,6 +92,7 @@ export const turnovers = pgTable(
     notes: text("notes"),
     startedAt: ts("started_at"),
     completedAt: ts("completed_at"),
+    remindedAt: ts("reminded_at"),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
   (t) => [index("turnovers_property_due").on(t.propertyId, t.dueFrom), index("turnovers_cleaner_due").on(t.cleanerId, t.dueFrom)],
