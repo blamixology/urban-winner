@@ -82,5 +82,9 @@ WhatsApp/SMS notifications, PMS APIs (Hostaway, Smoobu), inventory and linen, ma
 ## Milestones
 
 1. **M1 (this scaffold):** schema, auth, properties, feeds, sync, turnovers, cleaner page, dashboard.
-2. **M2:** payouts and CSV, at-risk flags, photo upload polish, and 10 host interviews.
-3. **M3:** WhatsApp notifications, billing, and the SITUR/compliance module.
+2. **M2 (done):** payouts and CSV, at-risk flags, photo upload polish. Still open: 10 host interviews.
+3. **M3 (done except billing keys/host interviews):**
+   - **SITUR occupancy report** (`/app/compliance`, CSV): arrivals and nights per property per month against its SITUR code. It's an occupancy summary, not the full guest register the same rules require — iCal carries no guest identity, so that register still needs a manual entry point or a PMS integration later.
+   - **Billing:** Free plan capped at 1 property; Stripe Checkout/portal/webhook wired and ready, just needs a live `STRIPE_SECRET_KEY`/`STRIPE_PRICE_ID`/`STRIPE_WEBHOOK_SECRET` to go live.
+   - **Automated reminders:** day-before SMS to the assigned cleaner via SMSO.ro (`/api/cron/notify`), once host interviews validate cleaners actually want this over the existing manual WhatsApp share button. Automated *WhatsApp* was dropped in favour of SMS: proactive WhatsApp messages need a Meta-approved template, SMS doesn't.
+4. **M4 (not started):** e-Factura for PFA/SRL cleaners, the guest-identity register, multi-cleaner teams, a native app.
