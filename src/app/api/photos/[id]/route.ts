@@ -1,13 +1,13 @@
 import { eq } from "drizzle-orm";
 import { NextResponse, type NextRequest } from "next/server";
 import { db, schema as s } from "@/lib/db";
-import { currentUserId } from "@/lib/auth";
+import { currentOrganizationId } from "@/lib/auth";
 import { readPhoto } from "@/lib/photos";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const [photo] = await db
-    .select({ path: s.photos.path, ownerId: s.properties.ownerId, cleanerToken: s.cleaners.token })
+    .select({ path: s.photos.path, organizationId: s.properties.organizationId, cleanerToken: s.cleaners.token })
     .from(s.photos)
     .innerJoin(s.turnovers, eq(s.photos.turnoverId, s.turnovers.id))
     .innerJoin(s.properties, eq(s.turnovers.propertyId, s.properties.id))
@@ -17,7 +17,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
   const token = req.nextUrl.searchParams.get("t");
   const isCleaner = !!token && photo.cleanerToken === token;
-  const isOwner = !isCleaner && (await currentUserId()) === photo.ownerId;
+  const isOwner = !isCleaner && (await currentOrganizationId()) === photo.organizationId;
   if (!isCleaner && !isOwner) return new NextResponse("Not found", { status: 404 });
 
   const { data, type } = await readPhoto(photo.path);

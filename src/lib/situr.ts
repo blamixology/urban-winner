@@ -13,12 +13,16 @@ import { dayInTz, monthRange } from "./time";
  * needs a manual entry point (or a PMS integration) — out of scope here.
  */
 export interface OccupancyRow {
+  turnoverId: string;
   propertyId: string;
   propertyName: string;
   siturCode: string | null;
   arrival: string; // YYYY-MM-DD, Europe/Bucharest
   departure: string;
   nights: number;
+  guestName: string | null;
+  guestIdDoc: string | null;
+  guestCount: number;
 }
 
 function dayToUtcMs(day: string): number {
@@ -30,22 +34,27 @@ export function nightsBetween(arrival: string, departure: string): number {
   return Math.round((dayToUtcMs(departure) - dayToUtcMs(arrival)) / (24 * 60 * 60 * 1000));
 }
 
-export async function occupancyReport(ownerId: string, month?: string) {
+export async function occupancyReport(organizationId: string, month?: string) {
   const range = monthRange(month);
   const rows = await db
     .select({
+      turnoverId: s.turnovers.id,
       propertyId: s.properties.id,
       propertyName: s.properties.name,
       siturCode: s.properties.siturCode,
       start: s.reservations.start,
       end: s.reservations.end,
+      guestName: s.guestRegistrations.guestName,
+      guestIdDoc: s.guestRegistrations.guestIdDoc,
+      guestCount: s.guestRegistrations.guestCount,
     })
     .from(s.turnovers)
     .innerJoin(s.properties, eq(s.turnovers.propertyId, s.properties.id))
     .innerJoin(s.reservations, eq(s.turnovers.reservationId, s.reservations.id))
+    .leftJoin(s.guestRegistrations, eq(s.guestRegistrations.turnoverId, s.turnovers.id))
     .where(
       and(
-        eq(s.properties.ownerId, ownerId),
+        eq(s.properties.organizationId, organizationId),
         ne(s.turnovers.status, "CANCELLED"),
         gte(s.reservations.start, range.from),
         lt(s.reservations.start, range.to),
@@ -56,7 +65,18 @@ export async function occupancyReport(ownerId: string, month?: string) {
   const occupancy: OccupancyRow[] = rows.map((r) => {
     const arrival = dayInTz(r.start);
     const departure = dayInTz(r.end);
-    return { propertyId: r.propertyId, propertyName: r.propertyName, siturCode: r.siturCode, arrival, departure, nights: nightsBetween(arrival, departure) };
+    return {
+      turnoverId: r.turnoverId,
+      propertyId: r.propertyId,
+      propertyName: r.propertyName,
+      siturCode: r.siturCode,
+      arrival,
+      departure,
+      nights: nightsBetween(arrival, departure),
+      guestName: r.guestName,
+      guestIdDoc: r.guestIdDoc,
+      guestCount: r.guestCount ?? 1,
+    };
   });
 
   const byProperty = new Map<string, { propertyName: string; siturCode: string | null; stays: number; nights: number }>();

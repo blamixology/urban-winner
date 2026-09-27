@@ -1,11 +1,11 @@
 import { timingSafeEqual } from "node:crypto";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNotNull, isNull } from "drizzle-orm";
 import { NextResponse, type NextRequest } from "next/server";
 import { db, schema as s } from "@/lib/db";
 import { cleanerLink } from "@/lib/cleaner";
 import { sendSms } from "@/lib/notify";
 import { fmtDay, fmtTime } from "@/lib/time";
-import { needsReminder } from "@/lib/turnovers";
+import { isAtRisk, needsReminder } from "@/lib/turnovers";
 
 export const dynamic = "force-dynamic";
 
@@ -48,5 +48,37 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, checked: rows.length, sent });
+  // At-risk alerts: text every host phone on file, once per turnover.
+  const atRiskRows = await db
+    .select({
+      id: s.turnovers.id,
+      status: s.turnovers.status,
+      dueBy: s.turnovers.dueBy,
+      atRiskNotifiedAt: s.turnovers.atRiskNotifiedAt,
+      propertyName: s.properties.name,
+      organizationId: s.properties.organizationId,
+    })
+    .from(s.turnovers)
+    .innerJoin(s.properties, eq(s.turnovers.propertyId, s.properties.id))
+    .where(and(eq(s.turnovers.status, "PENDING"), isNull(s.turnovers.atRiskNotifiedAt)));
+
+  let atRiskSent = 0;
+  for (const t of atRiskRows) {
+    if (!isAtRisk(t, now)) continue;
+    const hosts = await db
+      .select({ phone: s.users.phone })
+      .from(s.users)
+      .where(and(eq(s.users.organizationId, t.organizationId), isNotNull(s.users.phone)));
+    const text = `Atenție: curățenia la ${t.propertyName} nu a fost pornită și trebuie gata până la ${fmtTime(t.dueBy)}.`;
+    let anySent = false;
+    for (const h of hosts) {
+      if (h.phone && (await sendSms(h.phone, text))) anySent = true;
+    }
+    if (anySent) {
+      await db.update(s.turnovers).set({ atRiskNotifiedAt: now }).where(eq(s.turnovers.id, t.id));
+      atRiskSent += 1;
+    }
+  }
+
+  return NextResponse.json({ ok: true, checked: rows.length, sent, atRiskChecked: atRiskRows.length, atRiskSent });
 }

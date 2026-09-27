@@ -40,6 +40,14 @@ export function fmtDay(date: Date, tz = TZ): string {
   return new Intl.DateTimeFormat("ro-RO", { timeZone: tz, weekday: "long", day: "numeric", month: "long" }).format(date);
 }
 
+/** Minutes → "1h 20min" / "45min", for turnaround stats. */
+export function fmtMinutes(minutes: number | null): string {
+  if (minutes == null) return "—";
+  const h = Math.floor(minutes / 60);
+  const m = Math.round(minutes % 60);
+  return h > 0 ? `${h}h ${m}min` : `${m}min`;
+}
+
 /** Validates `month` (YYYY-MM, defaulting to the current month) and returns its UTC bounds. */
 export function monthRange(month: string | undefined, tz = TZ): { month: string; from: Date; to: Date } {
   const m = month && /^\d{4}-(0[1-9]|1[0-2])$/.test(month) ? month : dayInTz(new Date(), tz).slice(0, 7);

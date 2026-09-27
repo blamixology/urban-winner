@@ -6,16 +6,32 @@ const ts = (name: string) => timestamp(name, { withTimezone: true });
 
 export const feedSource = pgEnum("feed_source", ["AIRBNB", "BOOKING", "OTHER"]);
 export const turnoverStatus = pgEnum("turnover_status", ["PENDING", "IN_PROGRESS", "DONE", "ISSUE", "CANCELLED"]);
-export const userPlan = pgEnum("user_plan", ["FREE", "PRO"]);
+export const orgPlan = pgEnum("user_plan", ["FREE", "PRO"]); // SQL type name kept from before the org refactor
+
+/** The billing/ownership unit. A host and any teammates they invite share one organization. */
+export const organizations = pgTable("organizations", {
+  id: id(),
+  plan: orgPlan("plan").notNull().default("FREE"),
+  stripeCustomerId: text("stripe_customer_id").unique(),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  createdAt: ts("created_at").notNull().defaultNow(),
+});
 
 export const users = pgTable("users", {
   id: id(),
+  organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
   email: text("email").notNull().unique(),
   name: text("name"),
+  phone: text("phone"), // for at-risk SMS alerts
   passwordHash: text("password_hash").notNull(),
-  plan: userPlan("plan").notNull().default("FREE"),
-  stripeCustomerId: text("stripe_customer_id").unique(),
-  stripeSubscriptionId: text("stripe_subscription_id"),
+  createdAt: ts("created_at").notNull().defaultNow(),
+});
+
+/** A pending, single-use link a host shares to bring a teammate into their organization. */
+export const teamInvites = pgTable("team_invites", {
+  id: id(),
+  organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  token: text("token").notNull().unique(),
   createdAt: ts("created_at").notNull().defaultNow(),
 });
 
@@ -23,21 +39,21 @@ export const cleaners = pgTable(
   "cleaners",
   {
     id: id(),
-    ownerId: text("owner_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    organizationId: text("owner_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     phone: text("phone"),
     token: text("token").notNull().unique(),
     active: boolean("active").notNull().default(true),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
-  (t) => [index("cleaners_owner_idx").on(t.ownerId)],
+  (t) => [index("cleaners_owner_idx").on(t.organizationId)],
 );
 
 export const properties = pgTable(
   "properties",
   {
     id: id(),
-    ownerId: text("owner_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    organizationId: text("owner_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     address: text("address"),
     checkInTime: text("check_in_time").notNull().default("15:00"), // HH:mm Europe/Bucharest
@@ -47,7 +63,17 @@ export const properties = pgTable(
     defaultCleanerId: text("default_cleaner_id").references(() => cleaners.id, { onDelete: "set null" }),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
-  (t) => [index("properties_owner_idx").on(t.ownerId)],
+  (t) => [index("properties_owner_idx").on(t.organizationId)],
+);
+
+/** Which cleaners a property's team draws from — the assign dropdown is limited to these once any are set. */
+export const propertyCleaners = pgTable(
+  "property_cleaners",
+  {
+    propertyId: text("property_id").notNull().references(() => properties.id, { onDelete: "cascade" }),
+    cleanerId: text("cleaner_id").notNull().references(() => cleaners.id, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.propertyId, t.cleanerId] })],
 );
 
 export const calendarFeeds = pgTable(
@@ -93,6 +119,8 @@ export const turnovers = pgTable(
     startedAt: ts("started_at"),
     completedAt: ts("completed_at"),
     remindedAt: ts("reminded_at"),
+    atRiskNotifiedAt: ts("at_risk_notified_at"),
+    issueResolvedAt: ts("issue_resolved_at"),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
   (t) => [index("turnovers_property_due").on(t.propertyId, t.dueFrom), index("turnovers_cleaner_due").on(t.cleanerId, t.dueFrom)],
@@ -122,18 +150,47 @@ export const photos = pgTable("photos", {
   createdAt: ts("created_at").notNull().defaultNow(),
 });
 
+/** Guest identity for the SITUR register (EU Reg. 2024/1028) — iCal carries none of this, so it's entered by hand. */
+export const guestRegistrations = pgTable("guest_registrations", {
+  turnoverId: text("turnover_id").primaryKey().references(() => turnovers.id, { onDelete: "cascade" }),
+  guestName: text("guest_name"),
+  guestIdDoc: text("guest_id_doc"),
+  guestCount: integer("guest_count").notNull().default(1),
+  createdAt: ts("created_at").notNull().defaultNow(),
+});
+
 // ── relations (for db.query.*.findMany({ with })) ──
-export const usersRelations = relations(users, ({ many }) => ({ properties: many(properties), cleaners: many(cleaners) }));
+export const organizationsRelations = relations(organizations, ({ many }) => ({
+  users: many(users),
+  properties: many(properties),
+  cleaners: many(cleaners),
+  invites: many(teamInvites),
+}));
+export const usersRelations = relations(users, ({ one }) => ({
+  organization: one(organizations, { fields: [users.organizationId], references: [organizations.id] }),
+}));
+export const teamInvitesRelations = relations(teamInvites, ({ one }) => ({
+  organization: one(organizations, { fields: [teamInvites.organizationId], references: [organizations.id] }),
+}));
 export const cleanersRelations = relations(cleaners, ({ one, many }) => ({
-  owner: one(users, { fields: [cleaners.ownerId], references: [users.id] }),
+  organization: one(organizations, { fields: [cleaners.organizationId], references: [organizations.id] }),
   turnovers: many(turnovers),
+  properties: many(propertyCleaners),
 }));
 export const propertiesRelations = relations(properties, ({ one, many }) => ({
-  owner: one(users, { fields: [properties.ownerId], references: [users.id] }),
+  organization: one(organizations, { fields: [properties.organizationId], references: [organizations.id] }),
   defaultCleaner: one(cleaners, { fields: [properties.defaultCleanerId], references: [cleaners.id] }),
   feeds: many(calendarFeeds),
   turnovers: many(turnovers),
   checklist: many(checklistItems),
+  cleaners: many(propertyCleaners),
+}));
+export const propertyCleanersRelations = relations(propertyCleaners, ({ one }) => ({
+  property: one(properties, { fields: [propertyCleaners.propertyId], references: [properties.id] }),
+  cleaner: one(cleaners, { fields: [propertyCleaners.cleanerId], references: [cleaners.id] }),
+}));
+export const guestRegistrationsRelations = relations(guestRegistrations, ({ one }) => ({
+  turnover: one(turnovers, { fields: [guestRegistrations.turnoverId], references: [turnovers.id] }),
 }));
 export const feedsRelations = relations(calendarFeeds, ({ one, many }) => ({
   property: one(properties, { fields: [calendarFeeds.propertyId], references: [properties.id] }),
@@ -149,6 +206,7 @@ export const turnoversRelations = relations(turnovers, ({ one, many }) => ({
   cleaner: one(cleaners, { fields: [turnovers.cleanerId], references: [cleaners.id] }),
   checks: many(turnoverChecks),
   photos: many(photos),
+  guestRegistration: one(guestRegistrations, { fields: [turnovers.id], references: [guestRegistrations.turnoverId] }),
 }));
 export const checklistRelations = relations(checklistItems, ({ one }) => ({
   property: one(properties, { fields: [checklistItems.propertyId], references: [properties.id] }),

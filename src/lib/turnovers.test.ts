@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { isAtRisk, isBlock, needsReminder, planTurnovers, type ResLike } from "./turnovers";
 import { parseIcs, planSync } from "./ical";
-import { zonedToUtc } from "./time";
+import { fmtMinutes, zonedToUtc } from "./time";
 
 const noonUtc = (d: string) => new Date(`${d}T12:00:00Z`);
 const res = (id: string, start: string, end: string, extra: Partial<ResLike> = {}): ResLike => ({
@@ -17,6 +17,18 @@ describe("zonedToUtc", () => {
   it("handles the DST switch day", () => {
     expect(zonedToUtc("2026-10-25", "11:00").toISOString()).toBe("2026-10-25T09:00:00.000Z");
     expect(zonedToUtc("2026-03-29", "11:00").toISOString()).toBe("2026-03-29T08:00:00.000Z");
+  });
+});
+
+describe("fmtMinutes", () => {
+  it("shows an em dash for no data", () => {
+    expect(fmtMinutes(null)).toBe("—");
+  });
+  it("shows minutes only under an hour", () => {
+    expect(fmtMinutes(45)).toBe("45min");
+  });
+  it("shows hours and minutes over an hour", () => {
+    expect(fmtMinutes(95)).toBe("1h 35min");
   });
 });
 

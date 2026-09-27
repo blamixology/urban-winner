@@ -44,9 +44,18 @@ export async function currentUserId(): Promise<string | null> {
   }
 }
 
+/** The current user's organization id, or null when logged out. Cheap check for cross-request ownership, e.g. photo access. */
+export async function currentOrganizationId(): Promise<string | null> {
+  const id = await currentUserId();
+  if (!id) return null;
+  const user = await db.query.users.findFirst({ where: eq(s.users.id, id), columns: { organizationId: true } });
+  return user?.organizationId ?? null;
+}
+
+/** The logged-in user, with their organization (plan, Stripe ids) attached. */
 export async function requireUser() {
   const id = await currentUserId();
-  const user = id ? await db.query.users.findFirst({ where: eq(s.users.id, id) }) : undefined;
+  const user = id ? await db.query.users.findFirst({ where: eq(s.users.id, id), with: { organization: true } }) : undefined;
   if (!user) redirect("/login");
   return user;
 }

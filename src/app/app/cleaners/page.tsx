@@ -2,14 +2,19 @@ import { asc, desc, eq } from "drizzle-orm";
 import { db, schema as s } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { cleanerLink, whatsappShare } from "@/lib/cleaner";
+import { cleanerStats } from "@/lib/stats";
+import { fmtMinutes } from "@/lib/time";
 import { createCleaner, rotateCleanerLink, toggleCleaner } from "../actions";
 
 export default async function Cleaners() {
   const user = await requireUser();
-  const cleaners = await db.query.cleaners.findMany({
-    where: eq(s.cleaners.ownerId, user.id),
-    orderBy: [desc(s.cleaners.active), asc(s.cleaners.name)],
-  });
+  const [cleaners, stats] = await Promise.all([
+    db.query.cleaners.findMany({
+      where: eq(s.cleaners.organizationId, user.organizationId),
+      orderBy: [desc(s.cleaners.active), asc(s.cleaners.name)],
+    }),
+    cleanerStats(user.organizationId),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -44,6 +49,32 @@ export default async function Cleaners() {
           );
         })}
       </div>
+
+      {stats.length > 0 && (
+        <section>
+          <h2 className="h2 mb-3">Performanță (ultimele 90 de zile)</h2>
+          <table className="w-full overflow-hidden rounded-xl border border-neutral-200 bg-white text-sm">
+            <thead className="bg-neutral-50 text-left text-neutral-500">
+              <tr>
+                <th className="p-3">Persoană</th>
+                <th className="p-3 text-right">Finalizate</th>
+                <th className="p-3 text-right">Probleme</th>
+                <th className="p-3 text-right">Durată medie</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stats.map((row) => (
+                <tr key={row.cleanerId} className="border-t border-neutral-100">
+                  <td className="p-3">{row.name}</td>
+                  <td className="p-3 text-right">{row.completed}</td>
+                  <td className="p-3 text-right">{row.issues}</td>
+                  <td className="p-3 text-right">{fmtMinutes(row.avgMinutes)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
     </div>
   );
 }

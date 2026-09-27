@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { and, asc, eq } from "drizzle-orm";
 import { db, schema as s } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { addChecklistItem, addFeed, removeChecklistItem, removeFeed, updateProperty } from "../../actions";
+import { addChecklistItem, addFeed, removeChecklistItem, removeFeed, setPropertyTeam, updateProperty } from "../../actions";
 
 const SOURCE_LABEL = { AIRBNB: "Airbnb", BOOKING: "Booking.com", OTHER: "Alt calendar" } as const;
 
@@ -11,12 +11,13 @@ export default async function PropertyPage({ params }: { params: Promise<{ id: s
   const user = await requireUser();
   const [p, cleaners] = await Promise.all([
     db.query.properties.findFirst({
-      where: and(eq(s.properties.id, id), eq(s.properties.ownerId, user.id)),
-      with: { feeds: true, checklist: { orderBy: asc(s.checklistItems.position) } },
+      where: and(eq(s.properties.id, id), eq(s.properties.organizationId, user.organizationId)),
+      with: { feeds: true, checklist: { orderBy: asc(s.checklistItems.position) }, cleaners: true },
     }),
-    db.query.cleaners.findMany({ where: and(eq(s.cleaners.ownerId, user.id), eq(s.cleaners.active, true)), orderBy: asc(s.cleaners.name) }),
+    db.query.cleaners.findMany({ where: and(eq(s.cleaners.organizationId, user.organizationId), eq(s.cleaners.active, true)), orderBy: asc(s.cleaners.name) }),
   ]);
   if (!p) notFound();
+  const teamIds = new Set(p.cleaners.map((pc) => pc.cleanerId));
 
   return (
     <div className="space-y-8">
@@ -79,6 +80,23 @@ export default async function PropertyPage({ params }: { params: Promise<{ id: s
         <form action={addChecklistItem.bind(null, p.id)} className="mt-4 flex gap-2">
           <input name="label" required placeholder="ex. Verifică stocul de cafea" className="input" />
           <button className="btn-ghost shrink-0">Adaugă</button>
+        </form>
+      </section>
+
+      <section className="card">
+        <h2 className="h2">Echipa proprietății</h2>
+        <p className="mt-1 text-sm text-neutral-500">
+          Restrânge cine poate fi alocat aici. Fără nicio bifă, orice persoană activă poate fi aleasă (comportamentul de dinainte).
+        </p>
+        <form action={setPropertyTeam.bind(null, p.id)} className="mt-4 space-y-2">
+          {cleaners.map((c) => (
+            <label key={c.id} className="flex items-center gap-2 text-sm">
+              <input type="checkbox" name="cleanerIds" value={c.id} defaultChecked={teamIds.has(c.id)} />
+              {c.name}
+            </label>
+          ))}
+          {cleaners.length === 0 && <p className="text-sm text-neutral-500">Adaugă persoane în pagina Echipă mai întâi.</p>}
+          <button className="btn-ghost">Salvează echipa</button>
         </form>
       </section>
     </div>

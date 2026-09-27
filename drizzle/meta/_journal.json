@@ -15,6 +15,20 @@
       "when": 1790450976848,
       "tag": "0001_careless_gamora",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790510444588,
+      "tag": "0002_modern_wildside",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790510457616,
+      "tag": "0003_mute_sheva_callister",
+      "breakpoints": true
     }
   ]
 }

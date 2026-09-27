@@ -87,4 +87,12 @@ WhatsApp/SMS notifications, PMS APIs (Hostaway, Smoobu), inventory and linen, ma
    - **SITUR occupancy report** (`/app/compliance`, CSV): arrivals and nights per property per month against its SITUR code. It's an occupancy summary, not the full guest register the same rules require — iCal carries no guest identity, so that register still needs a manual entry point or a PMS integration later.
    - **Billing:** Free plan capped at 1 property; Stripe Checkout/portal/webhook wired and ready, just needs a live `STRIPE_SECRET_KEY`/`STRIPE_PRICE_ID`/`STRIPE_WEBHOOK_SECRET` to go live.
    - **Automated reminders:** day-before SMS to the assigned cleaner via SMSO.ro (`/api/cron/notify`), once host interviews validate cleaners actually want this over the existing manual WhatsApp share button. Automated *WhatsApp* was dropped in favour of SMS: proactive WhatsApp messages need a Meta-approved template, SMS doesn't.
-4. **M4 (not started):** e-Factura for PFA/SRL cleaners, the guest-identity register, multi-cleaner teams, a native app.
+4. **M3.5 (done):** things M4 listed that turned out not to need a PMS or e-Factura first —
+   - **Guest-identity register** (`/app/compliance`): manual name/ID/headcount per stay, filling the gap the M3 occupancy report flagged.
+   - **Multi-cleaner teams per property** (`/app/properties/{id}`): restrict which cleaners a property's assign dropdown offers.
+   - **Team accounts:** hosts and any teammates they invite (`/app/account`, `/invite/{token}`) now share one organization — billing plan and property/cleaner ownership moved from the user to the organization.
+   - **Issues inbox** (`/app/issues`): a cleaner-reported issue is tracked open→resolved instead of only showing as a status badge.
+   - **Cleaner performance stats** (`/app/cleaners`): completed/issue counts and average turnaround, last 90 days.
+   - **Feed-health banner:** a broken iCal sync now surfaces on the dashboard, not just on the property page.
+   - **At-risk SMS to the host:** the existing at-risk flag now also texts every host phone on file, once per turnover.
+5. **M4 (not started):** e-Factura for PFA/SRL cleaners, a native app.

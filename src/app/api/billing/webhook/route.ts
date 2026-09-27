@@ -11,9 +11,9 @@ async function setPlan(subscription: Stripe.Subscription) {
   const active = subscription.status === "active" || subscription.status === "trialing";
   const customerId = typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id;
   await db
-    .update(s.users)
+    .update(s.organizations)
     .set({ plan: active ? "PRO" : "FREE", stripeSubscriptionId: active ? subscription.id : null })
-    .where(eq(s.users.stripeCustomerId, customerId));
+    .where(eq(s.organizations.stripeCustomerId, customerId));
 }
 
 export async function POST(req: NextRequest) {
@@ -31,13 +31,13 @@ export async function POST(req: NextRequest) {
   switch (event.type) {
     case "checkout.session.completed": {
       const session = event.data.object as Stripe.Checkout.Session;
-      const userId = session.client_reference_id;
+      const organizationId = session.client_reference_id;
       const customerId = typeof session.customer === "string" ? session.customer : session.customer?.id;
-      if (userId && customerId) {
+      if (organizationId && customerId) {
         await db
-          .update(s.users)
+          .update(s.organizations)
           .set({ plan: "PRO", stripeCustomerId: customerId, stripeSubscriptionId: (session.subscription as string) ?? null })
-          .where(eq(s.users.id, userId));
+          .where(eq(s.organizations.id, organizationId));
       }
       break;
     }

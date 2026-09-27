@@ -1,10 +1,10 @@
 import "server-only";
-import { randomBytes } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db, schema as s } from "./db";
+import { randomToken } from "./token";
 
-export const newCleanerToken = () => randomBytes(24).toString("base64url");
+export const newCleanerToken = randomToken;
 
 /** Cleaners authenticate by the unguessable token in their link. */
 export async function requireCleaner(token: string) {

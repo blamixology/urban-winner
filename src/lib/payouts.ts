@@ -2,7 +2,7 @@ import { and, asc, eq, gte, lt } from "drizzle-orm";
 import { db, schema as s } from "./db";
 import { monthRange } from "./time";
 
-export async function payouts(ownerId: string, month?: string) {
+export async function payouts(organizationId: string, month?: string) {
   const range = monthRange(month);
   const done = await db
     .select({
@@ -17,7 +17,7 @@ export async function payouts(ownerId: string, month?: string) {
     .leftJoin(s.cleaners, eq(s.turnovers.cleanerId, s.cleaners.id))
     .where(
       and(
-        eq(s.properties.ownerId, ownerId),
+        eq(s.properties.organizationId, organizationId),
         eq(s.turnovers.status, "DONE"),
         gte(s.turnovers.completedAt, range.from),
         lt(s.turnovers.completedAt, range.to),

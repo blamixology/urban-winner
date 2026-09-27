@@ -4,12 +4,13 @@ import Link from "next/link";
 import { useActionState } from "react";
 import { login, signup, type AuthState } from "./auth-actions";
 
-export function AuthForm({ mode }: { mode: "login" | "signup" }) {
+export function AuthForm({ mode, inviteToken }: { mode: "login" | "signup"; inviteToken?: string }) {
   const [state, action, pending] = useActionState<AuthState, FormData>(mode === "login" ? login : signup, undefined);
   return (
     <main className="mx-auto max-w-sm px-4 py-20">
-      <h1 className="h1">{mode === "login" ? "Autentificare" : "Cont nou"}</h1>
+      <h1 className="h1">{inviteToken ? "Alătură-te echipei" : mode === "login" ? "Autentificare" : "Cont nou"}</h1>
       <form action={action} className="mt-6 space-y-4">
+        {inviteToken && <input type="hidden" name="inviteToken" value={inviteToken} />}
         {mode === "signup" && (
           <div>
             <label className="label" htmlFor="name">Nume</label>

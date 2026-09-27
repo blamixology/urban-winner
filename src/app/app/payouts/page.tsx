@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 export default async function Payouts({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
   const user = await requireUser();
-  const { month, rows } = await payouts(user.id, (await searchParams).month);
+  const { month, rows } = await payouts(user.organizationId, (await searchParams).month);
   const total = rows.reduce((s, r) => s + r.totalRon, 0);
 
   return (

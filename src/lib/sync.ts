@@ -98,11 +98,11 @@ export async function syncProperty(propertyId: string): Promise<void> {
   await rebuildTurnovers(propertyId);
 }
 
-export async function syncAll(ownerId?: string): Promise<number> {
+export async function syncAll(organizationId?: string): Promise<number> {
   const props = await db
     .select({ id: s.properties.id })
     .from(s.properties)
-    .where(ownerId ? eq(s.properties.ownerId, ownerId) : undefined);
+    .where(organizationId ? eq(s.properties.organizationId, organizationId) : undefined);
   for (const p of props) await syncProperty(p.id);
   return props.length;
 }

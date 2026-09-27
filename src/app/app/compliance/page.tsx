@@ -1,12 +1,13 @@
 import { requireUser } from "@/lib/auth";
 import { occupancyReport } from "@/lib/situr";
 import { fmtDay } from "@/lib/time";
+import { saveGuestRegistration } from "../actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function Compliance({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
   const user = await requireUser();
-  const { month, occupancy, totals } = await occupancyReport(user.id, (await searchParams).month);
+  const { month, occupancy, totals } = await occupancyReport(user.organizationId, (await searchParams).month);
   const missingCode = totals.some((t) => !t.siturCode);
 
   return (
@@ -55,20 +56,43 @@ export default async function Compliance({ searchParams }: { searchParams: Promi
       </table>
 
       <div className="card">
-        <h2 className="h2 mb-3">Detaliu sosiri</h2>
+        <h2 className="h2 mb-3">Registru oaspeți</h2>
+        <p className="mb-3 text-sm text-neutral-500">
+          Nume și document de identitate, completate manual — iCal nu trimite identitatea oaspetelui.
+        </p>
         <table className="w-full text-sm">
           <thead className="text-left text-neutral-500">
-            <tr><th className="py-1 pr-3">Proprietate</th><th className="py-1 pr-3">Sosire</th><th className="py-1 pr-3">Plecare</th><th className="py-1 text-right">Nopți</th></tr>
+            <tr>
+              <th className="py-1 pr-3">Proprietate</th>
+              <th className="py-1 pr-3">Sosire</th>
+              <th className="py-1 pr-3">Plecare</th>
+              <th className="py-1 pr-3 text-right">Nopți</th>
+              <th className="py-1 pr-3">Nume oaspete</th>
+              <th className="py-1 pr-3">CI/Pașaport</th>
+              <th className="py-1 pr-3 text-right">Nr. pers.</th>
+              <th className="py-1"></th>
+            </tr>
           </thead>
           <tbody>
-            {occupancy.map((o, i) => (
-              <tr key={i} className="border-t border-neutral-100">
-                <td className="py-1 pr-3">{o.propertyName}</td>
-                <td className="py-1 pr-3">{fmtDay(new Date(o.arrival))}</td>
-                <td className="py-1 pr-3">{fmtDay(new Date(o.departure))}</td>
-                <td className="py-1 text-right">{o.nights}</td>
-              </tr>
-            ))}
+            {occupancy.map((o) => {
+              const formId = `gr-${o.turnoverId}`;
+              return (
+                <tr key={o.turnoverId} className="border-t border-neutral-100">
+                  <td className="py-1 pr-3">{o.propertyName}</td>
+                  <td className="py-1 pr-3">{fmtDay(new Date(o.arrival))}</td>
+                  <td className="py-1 pr-3">{fmtDay(new Date(o.departure))}</td>
+                  <td className="py-1 pr-3 text-right">{o.nights}</td>
+                  <td className="py-1 pr-3"><input form={formId} name="guestName" defaultValue={o.guestName ?? ""} className="input py-1 text-xs" /></td>
+                  <td className="py-1 pr-3"><input form={formId} name="guestIdDoc" defaultValue={o.guestIdDoc ?? ""} className="input py-1 text-xs" /></td>
+                  <td className="py-1 pr-3"><input form={formId} name="guestCount" type="number" min={1} defaultValue={o.guestCount} className="input w-16 py-1 text-right text-xs" /></td>
+                  <td className="py-1">
+                    <button form={formId} className="btn-ghost px-2 py-1 text-xs">Salvează</button>
+                    <form id={formId} action={saveGuestRegistration.bind(null, o.turnoverId)} />
+                  </td>
+                </tr>
+              );
+            })}
+            {occupancy.length === 0 && <tr><td colSpan={8} className="py-2 text-neutral-500">Nicio sosire în {month}.</td></tr>}
           </tbody>
         </table>
       </div>

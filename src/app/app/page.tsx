@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { and, asc, count, eq, gte, lt, ne } from "drizzle-orm";
+import { and, asc, count, eq, gte, isNotNull, isNull, lt, ne } from "drizzle-orm";
 import { db, schema as s } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { dayInTz, fmtDay, fmtTime, zonedToUtc } from "@/lib/time";
@@ -14,10 +14,11 @@ export default async function Dashboard() {
   const from = zonedToUtc(dayInTz(new Date()), "00:00");
   const to = new Date(from.getTime() + 8 * 24 * 60 * 60 * 1000);
 
-  const [turnovers, cleaners, [{ n: propertyCount }]] = await Promise.all([
+  const [turnovers, cleaners, [{ n: propertyCount }], brokenFeeds, [{ n: openIssues }], teamRows] = await Promise.all([
     db
       .select({
         id: s.turnovers.id,
+        propertyId: s.turnovers.propertyId,
         dueFrom: s.turnovers.dueFrom,
         dueBy: s.turnovers.dueBy,
         status: s.turnovers.status,
@@ -26,11 +27,29 @@ export default async function Dashboard() {
       })
       .from(s.turnovers)
       .innerJoin(s.properties, eq(s.turnovers.propertyId, s.properties.id))
-      .where(and(eq(s.properties.ownerId, user.id), gte(s.turnovers.dueFrom, from), lt(s.turnovers.dueFrom, to), ne(s.turnovers.status, "CANCELLED")))
+      .where(and(eq(s.properties.organizationId, user.organizationId), gte(s.turnovers.dueFrom, from), lt(s.turnovers.dueFrom, to), ne(s.turnovers.status, "CANCELLED")))
       .orderBy(asc(s.turnovers.dueFrom)),
-    db.query.cleaners.findMany({ where: and(eq(s.cleaners.ownerId, user.id), eq(s.cleaners.active, true)), orderBy: asc(s.cleaners.name) }),
-    db.select({ n: count() }).from(s.properties).where(eq(s.properties.ownerId, user.id)),
+    db.query.cleaners.findMany({ where: and(eq(s.cleaners.organizationId, user.organizationId), eq(s.cleaners.active, true)), orderBy: asc(s.cleaners.name) }),
+    db.select({ n: count() }).from(s.properties).where(eq(s.properties.organizationId, user.organizationId)),
+    db
+      .select({ propertyName: s.properties.name, lastError: s.calendarFeeds.lastError })
+      .from(s.calendarFeeds)
+      .innerJoin(s.properties, eq(s.calendarFeeds.propertyId, s.properties.id))
+      .where(and(eq(s.properties.organizationId, user.organizationId), isNotNull(s.calendarFeeds.lastError))),
+    db
+      .select({ n: count() })
+      .from(s.turnovers)
+      .innerJoin(s.properties, eq(s.turnovers.propertyId, s.properties.id))
+      .where(and(eq(s.properties.organizationId, user.organizationId), eq(s.turnovers.status, "ISSUE"), isNull(s.turnovers.issueResolvedAt))),
+    db
+      .select({ propertyId: s.propertyCleaners.propertyId, cleanerId: s.propertyCleaners.cleanerId })
+      .from(s.propertyCleaners)
+      .innerJoin(s.properties, eq(s.propertyCleaners.propertyId, s.properties.id))
+      .where(eq(s.properties.organizationId, user.organizationId)),
   ]);
+
+  const teamByProperty = new Map<string, Set<string>>();
+  for (const r of teamRows) teamByProperty.set(r.propertyId, (teamByProperty.get(r.propertyId) ?? new Set()).add(r.cleanerId));
 
   const byDay = new Map<string, typeof turnovers>();
   for (const t of turnovers) {
@@ -49,6 +68,18 @@ export default async function Dashboard() {
       {propertyCount === 0 && (
         <div className="card">
           Începe prin a <Link className="underline" href="/app/properties">adăuga o proprietate</Link> și linkul iCal din Airbnb sau Booking.
+        </div>
+      )}
+      {brokenFeeds.length > 0 && (
+        <div className="rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-900">
+          {brokenFeeds.length} calendar{brokenFeeds.length === 1 ? "" : "e"} cu eroare de sincronizare: {brokenFeeds.map((f) => f.propertyName).join(", ")}.{" "}
+          Verifică linkul iCal în pagina proprietății.
+        </div>
+      )}
+      {openIssues > 0 && (
+        <div className="rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-900">
+          {openIssues} problemă{openIssues === 1 ? "" : "e"} raportată{openIssues === 1 ? "" : "e"} de curățenie —{" "}
+          <Link href="/app/issues" className="underline">vezi detalii</Link>.
         </div>
       )}
       {unassigned > 0 && (
@@ -72,7 +103,12 @@ export default async function Dashboard() {
                 <form action={assignTurnover.bind(null, t.id)} className="flex gap-2">
                   <select name="cleanerId" defaultValue={t.cleanerId ?? ""} className="input w-40">
                     <option value="">— nealocat —</option>
-                    {cleaners.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    {cleaners
+                      .filter((c) => {
+                        const team = teamByProperty.get(t.propertyId);
+                        return !team || team.size === 0 || team.has(c.id);
+                      })
+                      .map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                   <button className="btn-ghost">Salvează</button>
                 </form>

@@ -18,11 +18,11 @@ export default async function Properties() {
     .from(s.properties)
     .leftJoin(s.cleaners, eq(s.properties.defaultCleanerId, s.cleaners.id))
     .leftJoin(s.calendarFeeds, eq(s.calendarFeeds.propertyId, s.properties.id))
-    .where(eq(s.properties.ownerId, user.id))
+    .where(eq(s.properties.organizationId, user.organizationId))
     .groupBy(s.properties.id, s.cleaners.name)
     .orderBy(asc(s.properties.name));
 
-  const atLimit = user.plan === "FREE" && properties.length >= FREE_PROPERTY_LIMIT;
+  const atLimit = user.organization.plan === "FREE" && properties.length >= FREE_PROPERTY_LIMIT;
 
   return (
     <div className="space-y-6">

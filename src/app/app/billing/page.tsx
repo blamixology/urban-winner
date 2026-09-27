@@ -6,8 +6,9 @@ export const dynamic = "force-dynamic";
 export default async function Billing({ searchParams }: { searchParams: Promise<{ checkout?: string }> }) {
   const user = await requireUser();
   const { checkout } = await searchParams;
-  const properties = await propertyCount(user.id);
+  const properties = await propertyCount(user.organizationId);
   const configured = stripeConfigured();
+  const org = user.organization;
 
   return (
     <div className="max-w-md space-y-6">
@@ -23,23 +24,23 @@ export default async function Billing({ searchParams }: { searchParams: Promise<
       <div className="card space-y-3">
         <div className="flex items-center justify-between">
           <span className="font-medium">Plan curent</span>
-          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${user.plan === "PRO" ? "bg-emerald-100 text-emerald-800" : "bg-neutral-100 text-neutral-700"}`}>
-            {user.plan === "PRO" ? "Pro" : "Gratuit"}
+          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${org.plan === "PRO" ? "bg-emerald-100 text-emerald-800" : "bg-neutral-100 text-neutral-700"}`}>
+            {org.plan === "PRO" ? "Pro" : "Gratuit"}
           </span>
         </div>
         <div className="text-sm text-neutral-500">
-          {properties} {properties === 1 ? "proprietate" : "proprietăți"} {user.plan === "FREE" && `din ${FREE_PROPERTY_LIMIT} inclusă`}
+          {properties} {properties === 1 ? "proprietate" : "proprietăți"} {org.plan === "FREE" && `din ${FREE_PROPERTY_LIMIT} inclusă`}
         </div>
 
         {!configured && (
           <p className="text-sm text-neutral-500">Plățile online nu sunt încă activate pentru acest cont.</p>
         )}
-        {configured && user.plan === "FREE" && (
+        {configured && org.plan === "FREE" && (
           <form action="/api/billing/checkout" method="POST">
             <button className="btn w-full">Treci la Pro — 25 lei/proprietate/lună</button>
           </form>
         )}
-        {configured && user.plan === "PRO" && user.stripeCustomerId && (
+        {configured && org.plan === "PRO" && org.stripeCustomerId && (
           <form action="/api/billing/portal" method="POST">
             <button className="btn-ghost w-full">Gestionează abonamentul</button>
           </form>
