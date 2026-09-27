@@ -28,7 +28,7 @@ export default async function Billing({ searchParams }: { searchParams: Promise<
           </span>
         </div>
         <div className="text-sm text-neutral-500">
-          {properties} proprietate{properties === 1 ? "" : "ăți"} {user.plan === "FREE" && `din ${FREE_PROPERTY_LIMIT} incluse`}
+          {properties} {properties === 1 ? "proprietate" : "proprietăți"} {user.plan === "FREE" && `din ${FREE_PROPERTY_LIMIT} inclusă`}
         </div>
 
         {!configured && (
